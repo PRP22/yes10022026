@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pingu-Snap | 3D Valentine Surprise</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Gaegu:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            font-family: 'Fredoka', sans-serif; 
+            background: #fffafb; 
+            color: #4a4a4a; 
+            margin: 0; 
+            padding: 0; 
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+        }
+        .handwritten { font-family: 'Gaegu', cursive; }
+        
+        nav { z-index: 1000; }
+        nav button { pointer-events: auto !important; cursor: pointer; }
+        
+        #canvas-container { 
+            width: 100%; 
+            height: 100vh; 
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 5; 
+            touch-action: none; 
+            overflow: hidden;
+        }
+
+        /* Cinematic Bars */
+        .cinema-bar {
+            position: fixed;
+            left: 0;
+            width: 100%;
+            height: 0;
+            background: #1a1a1a;
+            z-index: 100;
+            transition: height 1s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .cinema-mode .cinema-bar { height: 12vh; }
+
+        .polaroid { 
+            box-shadow: 0 20px 60px rgba(255, 182, 193, 0.35); 
+            border: 14px solid white; 
+            background: white;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        /* Sticker Editor UI - Centered Circular Toolbar */
+        .sticker-wrapper {
+            position: absolute;
+            transform: translate(-50%, -50%);
+            z-index: 200;
+            pointer-events: auto;
+            cursor: move;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .sticker-emoji {
+            font-size: 3.8rem;
+            user-select: none;
+            display: block;
+            filter: drop-shadow(0 4px 8px rgba(0,0,0,0.15));
+            pointer-events: none;
+        }
+        .sticker-toolbar {
+            position: absolute;
+            bottom: -60px;
+            left: 50%;
+            transform: translateX(-50%) scale(0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: white;
+            padding: 8px 16px;
+            border-radius: 50px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.2);
+            gap: 12px;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            border: 2px solid #fee2e2;
+            pointer-events: auto;
+            width: max-content;
+        }
+        .sticker-wrapper:hover .sticker-toolbar { opacity: 1; visibility: visible; transform: translateX(-50%) scale(1); }
+        
+        .tool-btn {
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            font-weight: bold;
+            color: #f43f5e;
+            background: #fff1f2;
+            border: 1px solid #fecdd3;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+        .tool-btn:hover { background: #f43f5e; color: white; transform: scale(1.15); }
+
+        .flash { position: fixed; inset: 0; background: white; z-index: 2000; pointer-events: none; opacity: 0; transition: opacity 0.1s; }
+        .flash.active { opacity: 1; }
+
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        [x-cloak] { display: none !important; }
+
+        .overlay-ui {
+            position: relative;
+            z-index: 50;
+            pointer-events: none;
+        }
+        .overlay-ui * { pointer-events: auto; }
+    </style>
+</head>
+<body x-data="pinguApp()" x-init="init()" :class="isLoveAnimating ? 'cinema-mode' : ''" class="overflow-x-hidden">
+
+    <div :class="flashActive ? 'active' : ''" class="flash"></div>
+
+    <!-- Cinematic Elements -->
+    <div class="cinema-bar top-0"></div>
+    <div class="cinema-bar bottom-0"></div>
+
+    <!-- Nav -->
+    <nav class="fixed top-6 left-1/2 -translate-x-1/2 flex bg-white/95 backdrop-blur-md p-1.5 rounded-full shadow-2xl border border-pink-100 transition-transform duration-500" :class="isLoveAnimating ? '-translate-y-32' : ''">
+        <button @click="setStep(1)" :class="step === 1 ? 'bg-pink-500 text-white shadow-lg' : 'text-pink-300'" class="px-6 py-2.5 rounded-full font-bold text-sm uppercase tracking-wider outline-none">Home</button>
+        <button @click="setStep(2)" :class="step === 2 ? 'bg-pink-500 text-white shadow-lg' : 'text-pink-300'" class="px-6 py-2.5 rounded-full font-bold text-sm uppercase tracking-wider mx-1 outline-none">Booth</button>
+        <button @click="setStep(3)" :class="step === 3 ? 'bg-pink-500 text-white shadow-lg' : 'text-pink-300'" class="px-6 py-2.5 rounded-full font-bold text-sm uppercase tracking-wider outline-none">Letter</button>
+    </nav>
+
+    <!-- STEP 1: CINEMATIC STORY -->
+    <section x-show="step === 1" x-cloak x-transition.opacity class="min-h-screen relative">
+        <div id="canvas-container"></div>
+
+        <!-- Story Intro UI -->
+        <div x-show="!isLoveAnimating" class="absolute inset-0 flex flex-col items-center justify-center overlay-ui text-center px-6">
+            <h1 class="text-5xl font-bold text-pink-500 tracking-tight mb-4 drop-shadow-sm">Pingu's Story</h1>
+            <p class="text-gray-500 text-lg mb-10 max-w-xs">A little movie about us...</p>
+            
+            <button @click="triggerLoveAnimation" class="bg-pink-500 hover:bg-pink-600 text-white px-12 py-5 rounded-full font-bold text-xl shadow-2xl transition-all transform hover:scale-105 active:scale-95 flex items-center gap-3">
+                Play Our Movie 🎬
+            </button>
+            <p class="mt-8 text-pink-300 font-bold handwritten text-2xl">Official since Feb 10th ❤️</p>
+        </div>
+
+        <!-- Dialogue Bubble -->
+        <div x-show="bubble" x-transition:enter="transition ease-out duration-500" x-transition:enter-start="opacity-0 translate-y-10 scale-90" class="fixed bottom-28 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur-md px-10 py-6 rounded-[3rem] shadow-2xl border-2 border-pink-100 max-w-sm text-center z-[150] pointer-events-none">
+            <p class="text-pink-600 font-bold text-xl handwritten" x-text="message"></p>
+        </div>
+    </section>
+
+    <!-- STEP 2: PHOTOBOOTH -->
+    <section x-show="step === 2" x-cloak x-transition.opacity class="min-h-screen pt-28 pb-32 px-4 bg-pink-50/10 relative z-[200]">
+        <div class="max-w-6xl mx-auto flex flex-col lg:flex-row gap-10">
+            
+            <div class="flex-1 space-y-6">
+                <div class="bg-white p-8 rounded-[3rem] shadow-xl border border-pink-50">
+                    <div class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+                        <h2 class="text-3xl font-bold text-pink-500 tracking-tighter">Pingu-Snap 📸</h2>
+                        <div class="flex gap-2 bg-pink-50 p-1.5 rounded-full shadow-inner">
+                            <template x-for="n in [2, 3, 4, 5, 8]">
+                                <button @click="setGrid(n)" :class="photoCount == n ? 'bg-pink-500 text-white shadow-md scale-105' : 'text-pink-400 hover:bg-white'" class="w-10 h-10 rounded-full text-xs font-bold transition-all" x-text="n"></button>
+                            </template>
+                        </div>
+                    </div>
+
+                    <div class="relative bg-slate-900 rounded-[2.5rem] overflow-hidden aspect-[4/3] border-[10px] border-pink-50 shadow-inner">
+                        <video id="video" autoplay playsinline class="w-full h-full object-cover"></video>
+                        <div x-show="!isCapturing && captured.length < photoCount" class="absolute inset-0 flex flex-col items-center justify-center bg-black/40 backdrop-blur-sm">
+                            <button @click="startCapture" class="bg-pink-500 text-white px-12 py-4 rounded-full font-bold shadow-2xl hover:scale-105 transition-transform active:scale-95 text-lg">Take Shot 📸</button>
+                        </div>
+                        <div x-show="countdown > 0" class="absolute inset-0 flex items-center justify-center text-white text-[160px] font-bold drop-shadow-2xl" x-text="countdown"></div>
+                    </div>
+
+                    <div class="mt-8 p-8 bg-pink-50/40 rounded-[2.5rem] border border-pink-100">
+                        <p class="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-5 ml-2">Decorate your memories</p>
+                        <div class="flex gap-6 text-4xl overflow-x-auto no-scrollbar pb-3 px-2">
+                            <template x-for="e in emojiLibrary">
+                                <button @click="addSticker(e)" class="hover:scale-125 transition-transform active:scale-90 flex-shrink-0" x-text="e"></button>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="w-full lg:w-80 flex flex-col items-center">
+                <div id="final-strip" :class="templates[selectedTemplate].bg" class="polaroid w-full flex flex-col items-center gap-4 p-6 min-h-[600px] transition-colors duration-500">
+                    <template x-for="(pic, idx) in captured">
+                        <div class="relative w-full group">
+                            <img :src="pic" class="w-full aspect-[4/3] object-cover rounded shadow-sm border border-black/5">
+                            <button @click="retake(idx)" class="absolute inset-0 flex items-center justify-center bg-black/50 text-white opacity-0 group-hover:opacity-100 transition rounded text-xs font-bold uppercase tracking-widest">Retake 🔄</button>
+                        </div>
+                    </template>
+
+                    <template x-for="i in Array.from({length: Math.max(0, photoCount - captured.length)})">
+                        <div class="w-full aspect-[4/3] bg-pink-50/50 rounded flex items-center justify-center text-pink-200 border-2 border-dashed border-pink-100">
+                            <span class="text-[10px] font-bold uppercase tracking-widest">Shot <span x-text="captured.length + i + 1"></span></span>
+                        </div>
+                    </template>
+
+                    <!-- Stickers -->
+                    <div class="absolute inset-0 pointer-events-none overflow-hidden">
+                        <template x-for="(st, index) in activeStickers">
+                            <div class="sticker-wrapper" 
+                                 :style="`left: ${st.x}%; top: ${st.y}%;`"
+                                 @mousedown="dragStart($event, index)"
+                                 @touchstart.stop="dragStart($event, index)">
+                                <span class="sticker-emoji" :style="`transform: rotate(${st.rotation}deg) scale(${st.scale});`" x-text="st.emoji"></span>
+                                <div class="sticker-toolbar">
+                                    <button @click.stop="st.rotation += 45" class="tool-btn">↻</button>
+                                    <button @click.stop="st.scale += 0.2" class="tool-btn">+</button>
+                                    <button @click.stop="st.scale = Math.max(0.4, st.scale - 0.2)" class="tool-btn">−</button>
+                                    <button @click.stop="removeSticker(index)" class="tool-btn">✕</button>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+
+                    <div class="mt-10 text-center pb-2" :class="templates[selectedTemplate].text">
+                        <p class="text-sm font-bold tracking-[0.5em] uppercase">PinguSnap</p>
+                        <p class="handwritten text-2xl mt-2">Official Since 10.02.26</p>
+                    </div>
+                </div>
+
+                <div class="mt-8 w-full flex flex-col gap-3">
+                    <button @click="downloadStrip" class="w-full bg-pink-500 text-white font-bold py-5 rounded-[2rem] shadow-xl disabled:opacity-50 text-lg transition hover:bg-pink-600" :disabled="captured.length === 0">Download Strip 💾</button>
+                    <button @click="resetBooth" class="w-full bg-white text-gray-400 py-3 rounded-[2rem] border-2 border-pink-50 hover:bg-pink-50 transition">Clear & Start Over 🔄</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- STEP 3: LETTER -->
+    <section x-show="step === 3" x-cloak x-transition.opacity class="min-h-screen flex items-center justify-center p-6 bg-pink-50/20 relative z-[200]">
+        <div class="bg-white p-10 md:p-14 rounded-[3rem] md:rounded-[4rem] shadow-2xl max-w-2xl w-full relative border-b-[20px] border-pink-400 text-center overflow-y-auto max-h-[85vh] no-scrollbar">
+            <div class="absolute -top-12 left-1/2 -translate-x-1/2 text-[80px] md:text-[100px] drop-shadow-xl">💌</div>
+            <h3 class="text-3xl md:text-4xl font-bold text-gray-800 mb-6 mt-4 tracking-tighter">To My Favourite Human,</h3>
+            
+            <div class="space-y-6 text-gray-600 leading-relaxed text-lg md:text-xl handwritten text-left px-2">
+                <p>
+                    I’ve been thinking about February 10th since the second it happened. When you said "Yes," it wasn't just a moment—it was the start of something that makes every sunset feel like a movie. Four days might seem short to others, but for me, it feels like I finally found the person I want to waddle through life with.
+                </p>
+                <p>
+                    I know how much you love capturing memories, from the Uniseoul booth strips to the Polaroids we’ll eventually fill our walls with. That’s why I wanted to build this for you. Even when we aren't near a photo booth, I want us to have a space that is just ours—where we can be as silly as penguins and as happy as we were that Tuesday night.
+                </p>
+                <p>
+                    World is Big, but it felt so much smaller and warmer the moment you became part of my life. Thank you for being you. For the smiles, for the "Yes," and for making this the most special Valentine’s I’ve ever had. 
+                </p>
+                <p>
+                    I promise to always find the best pebbles for you and to keep adding new snapshots to our story, one day at a time. I can't wait for all the waddles, hugs, and forehead kisses that are yet to come.
+                </p>
+            </div>
+
+            <div class="pt-10">
+                <p class="text-pink-500 font-bold text-2xl md:text-3xl mb-2">Happy Valentine's Day! ❤️</p>
+                <p class="text-gray-300 font-bold text-[10px] uppercase tracking-[0.4em]">Forever Yours • 14.02.26</p>
+            </div>
+        </div>
+    </section>
+
+    <script>
+        // THREE JS GLOBALS
+        let scene, camera, renderer, pingu1, pingu2, hearts = [];
+        let p1Wings = [], p2Wings = [];
+        let isCinemaMode = false;
+        let storyTime = 0;
+
+        function pinguApp() {
+            return {
+                step: 1,
+                flashActive: false,
+                photoCount: 4,
+                countdown: 0,
+                isCapturing: false,
+                captured: [],
+                activeStickers: [],
+                selectedTemplate: 'pink',
+                bubble: false,
+                message: "",
+                emojiLibrary: ['❤️', '🌷', '🎀', '🐱', '🐧', '🧸', '✨', '🌸', '💖', '🐾', '☁️', '🎀'],
+                templates: {
+                    pink: { bg: 'bg-[#fff0f3]', text: 'text-pink-400' },
+                    white: { bg: 'bg-white', text: 'text-gray-400' },
+                    sky: { bg: 'bg-[#e0f2fe]', text: 'text-sky-500' }
+                },
+                isLoveAnimating: false,
+
+                init() {
+                    this.$nextTick(() => {
+                        this.init3D();
+                        this.setupCamera();
+                    });
+                },
+
+                setStep(s) {
+                    this.step = s;
+                    if(s === 2) setTimeout(() => this.setupCamera(), 100);
+                },
+
+                async triggerLoveAnimation() {
+                    if (this.isLoveAnimating) return;
+                    this.isLoveAnimating = true;
+                    isCinemaMode = true;
+                    storyTime = Date.now();
+
+                    const playScript = async () => {
+                        this.bubble = true;
+                        this.message = "Hey you... ✨";
+                        await new Promise(r => setTimeout(r, 2000));
+                        this.message = "Do you remember Feb 10th?";
+                        await new Promise(r => setTimeout(r, 2500));
+                        this.message = "When you said YES... ❤️";
+                        await new Promise(r => setTimeout(r, 2500));
+                        this.message = "Since then, my world is pink!";
+                        await new Promise(r => setTimeout(r, 3000));
+                        this.message = "I love you so much. Happy Valentine's!";
+                        await new Promise(r => setTimeout(r, 4000));
+                        this.bubble = false;
+                        this.isLoveAnimating = false;
+                        isCinemaMode = false;
+                    };
+                    playScript();
+                },
+
+                createPearPingu(color, hasBow) {
+                    const group = new THREE.Group();
+                    const wings = [];
+                    
+                    // Pear Body
+                    const body = new THREE.Mesh(
+                        new THREE.SphereGeometry(1, 32, 32),
+                        new THREE.MeshStandardMaterial({ color: color, roughness: 0.8 })
+                    );
+                    body.scale.set(1.1, 1.45, 1);
+                    group.add(body);
+
+                    // Belly
+                    const belly = new THREE.Mesh(
+                        new THREE.SphereGeometry(0.85, 24, 24),
+                        new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1.0 })
+                    );
+                    belly.position.set(0, -0.1, 0.45);
+                    belly.scale.set(0.85, 0.95, 0.4);
+                    group.add(belly);
+
+                    // Arms
+                    const armGeo = new THREE.SphereGeometry(0.35, 16, 16);
+                    [-1, 1].forEach(side => {
+                        const armContainer = new THREE.Group();
+                        armContainer.position.set(side * 0.95, 0.2, 0.1);
+                        const arm = new THREE.Mesh(armGeo, new THREE.MeshStandardMaterial({ color: color }));
+                        arm.scale.set(0.6, 1.3, 0.4);
+                        arm.position.y = -0.4;
+                        armContainer.add(arm);
+                        armContainer.rotation.z = side * 0.4;
+                        group.add(armContainer);
+                        wings.push(armContainer);
+                    });
+
+                    // Feet
+                    const footMat = new THREE.MeshStandardMaterial({ color: 0xffa726 });
+                    [-1, 1].forEach(side => {
+                        const foot = new THREE.Mesh(new THREE.SphereGeometry(0.3, 12, 12), footMat);
+                        foot.scale.set(1, 0.4, 1.4);
+                        foot.position.set(side * 0.5, -1.3, 0.3);
+                        group.add(foot);
+                    });
+
+                    // Eyes & Beak
+                    const eyeGeo = new THREE.SphereGeometry(0.12, 12, 12);
+                    const eyeMat = new THREE.MeshStandardMaterial({ color: 0x000000 });
+                    [-1, 1].forEach(side => {
+                        const eye = new THREE.Mesh(eyeGeo, eyeMat);
+                        eye.position.set(side * 0.35, 0.7, 0.85);
+                        group.add(eye);
+                    });
+                    const beak = new THREE.Mesh(new THREE.ConeGeometry(0.15, 0.3, 12), footMat);
+                    beak.rotation.x = Math.PI / 1.7;
+                    beak.position.set(0, 0.45, 1);
+                    group.add(beak);
+
+                    // Blush
+                    const blushMat = new THREE.MeshStandardMaterial({ color: 0xffb3c1, transparent: true, opacity: 0.6 });
+                    [-1, 1].forEach(side => {
+                        const blush = new THREE.Mesh(new THREE.SphereGeometry(0.2, 12, 12), blushMat);
+                        blush.position.set(side * 0.6, 0.3, 0.8);
+                        blush.scale.z = 0.1;
+                        group.add(blush);
+                    });
+
+                    if (hasBow) {
+                        const bowMat = new THREE.MeshStandardMaterial({ color: 0xff69b4 });
+                        const b = new THREE.Mesh(new THREE.SphereGeometry(0.12, 12, 12), bowMat);
+                        b.position.set(0.4, 1.2, 0.5);
+                        group.add(b);
+                    } else {
+                        const scarf = new THREE.Mesh(new THREE.TorusGeometry(0.85, 0.13, 12, 40), new THREE.MeshStandardMaterial({ color: 0xef4444 }));
+                        scarf.rotation.x = Math.PI/2;
+                        scarf.position.y = 0.1;
+                        group.add(scarf);
+                    }
+
+                    return { group, wings };
+                },
+
+                init3D() {
+                    const container = document.getElementById('canvas-container');
+                    scene = new THREE.Scene();
+                    camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+                    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+                    renderer.setSize(window.innerWidth, window.innerHeight);
+                    renderer.setPixelRatio(window.devicePixelRatio);
+                    container.appendChild(renderer.domElement);
+
+                    scene.add(new THREE.AmbientLight(0xffffff, 1.2));
+                    const dl = new THREE.DirectionalLight(0xffffff, 0.5);
+                    dl.position.set(5, 10, 5);
+                    scene.add(dl);
+
+                    const p1 = this.createPearPingu(0x222222, false);
+                    pingu1 = p1.group; p1Wings = p1.wings;
+                    const p2 = this.createPearPingu(0x222222, true);
+                    pingu2 = p2.group; p2Wings = p2.wings;
+                    
+                    scene.add(pingu1); scene.add(pingu2);
+                    pingu2.position.x = 12;
+                    camera.position.set(0, 1, 8);
+
+                    // Hearts
+                    const hs = new THREE.Shape();
+                    hs.moveTo(0,0); hs.bezierCurveTo(0,0.1,-0.2,0.5,-0.5,0.5); hs.bezierCurveTo(-1,0.5,-1,-0.2,-1,-0.2); hs.bezierCurveTo(-1,-0.6,-0.5,-1.1,0,-1.5); hs.bezierCurveTo(0.5,-1.1,1,-0.6,1,-0.2); hs.bezierCurveTo(1,-0.2,1,0.5,0.5,0.5); hs.bezierCurveTo(0.2,0.5,0,0.1,0,0);
+                    const hMat = new THREE.MeshBasicMaterial({ color: 0xff4d6d });
+                    for(let i=0; i<20; i++) {
+                        const h = new THREE.Mesh(new THREE.ShapeGeometry(hs), hMat);
+                        h.scale.set(0,0,0); h.rotation.x = Math.PI;
+                        scene.add(h); hearts.push(h);
+                    }
+
+                    const animate = () => {
+                        requestAnimationFrame(animate);
+                        const t = Date.now() * 0.001;
+
+                        if (isCinemaMode) {
+                            const dt = Date.now() - storyTime;
+                            
+                            // Phase 1: Walking together
+                            pingu1.position.x = THREE.MathUtils.lerp(pingu1.position.x, -0.5, 0.05);
+                            pingu2.position.x = THREE.MathUtils.lerp(pingu2.position.x, 0.5, 0.05);
+                            
+                            // Phase 2: The Hug (Wrap arms)
+                            if (dt > 3000) {
+                                pingu1.rotation.z = THREE.MathUtils.lerp(pingu1.rotation.z, 0.25, 0.1);
+                                pingu2.rotation.z = THREE.MathUtils.lerp(pingu2.rotation.z, -0.25, 0.1);
+                                p1Wings.forEach((w,i) => w.rotation.y = THREE.MathUtils.lerp(w.rotation.y, i==0?0.9:-0.9, 0.1));
+                                p2Wings.forEach((w,i) => w.rotation.y = THREE.MathUtils.lerp(w.rotation.y, i==0?0.9:-0.9, 0.1));
+                            }
+                            
+                            // Phase 3: The Kiss
+                            if (dt > 7000) {
+                                pingu2.position.y = THREE.MathUtils.lerp(pingu2.position.y, 0.5, 0.1);
+                                pingu2.position.x = THREE.MathUtils.lerp(pingu2.position.x, 0.2, 0.1);
+                                hearts.forEach((h, i) => {
+                                    if(dt > 7500 + i*100) {
+                                        h.scale.set(0.15,0.15,0.15);
+                                        h.position.set(Math.sin(t*2+i)*3, Math.cos(t*2+i)*3+2, Math.sin(i)*2);
+                                    }
+                                });
+                            }
+
+                            // Camera movement
+                            camera.position.z = THREE.MathUtils.lerp(camera.position.z, 6, 0.02);
+                        } else {
+                            // IDLE
+                            pingu1.position.x = THREE.MathUtils.lerp(pingu1.position.x, 0, 0.05);
+                            pingu2.position.x = THREE.MathUtils.lerp(pingu2.position.x, 12, 0.05);
+                            pingu1.rotation.y = Math.sin(t) * 0.2;
+                            pingu1.rotation.z = 0;
+                            p1Wings.forEach(w => w.rotation.y = THREE.MathUtils.lerp(w.rotation.y, 0, 0.1));
+                            hearts.forEach(h => h.scale.set(0,0,0));
+                            camera.position.z = THREE.MathUtils.lerp(camera.position.z, 8, 0.05);
+                        }
+
+                        pingu1.scale.y = 1.45 * (1 + Math.sin(t*2)*0.02);
+                        pingu2.scale.y = 1.45 * (1 + Math.sin(t*2)*0.02);
+                        renderer.render(scene, camera);
+                    };
+                    animate();
+                    
+                    window.addEventListener('resize', () => {
+                        camera.aspect = window.innerWidth / window.innerHeight;
+                        camera.updateProjectionMatrix();
+                        renderer.setSize(window.innerWidth, window.innerHeight);
+                    });
+                },
+
+                async setupCamera() {
+                    const video = document.getElementById('video');
+                    if (!video) return;
+                    try {
+                        const s = await navigator.mediaDevices.getUserMedia({ video: { width: 800, height: 600, facingMode: "user" } });
+                        video.srcObject = s;
+                    } catch (e) { console.warn("Camera failed"); }
+                },
+
+                setGrid(n) { this.photoCount = n; this.captured = []; },
+                startCapture() {
+                    if (this.captured.length >= this.photoCount) return;
+                    this.isCapturing = true; this.countdown = 3;
+                    const timer = setInterval(() => {
+                        this.countdown--;
+                        if (this.countdown <= 0) { clearInterval(timer); this.takePhoto(); }
+                    }, 1000);
+                },
+                takePhoto() {
+                    this.flashActive = true;
+                    const video = document.getElementById('video');
+                    const canvas = document.createElement('canvas');
+                    canvas.width = 800; canvas.height = 600;
+                    const ctx = canvas.getContext('2d');
+                    ctx.translate(canvas.width, 0); ctx.scale(-1, 1);
+                    ctx.drawImage(video, 0, 0, 800, 600);
+                    this.captured.push(canvas.toDataURL('image/png'));
+                    this.isCapturing = false;
+                    setTimeout(() => this.flashActive = false, 150);
+                },
+                retake(idx) { this.captured.splice(idx, 1); },
+                addSticker(emoji) { this.activeStickers.push({ emoji, x: 50, y: 50, rotation: 0, scale: 1.2 }); },
+                dragStart(e, index) {
+                    const rect = document.getElementById('final-strip').getBoundingClientRect();
+                    const getPos = (ev) => {
+                        const cx = ev.touches ? ev.touches[0].clientX : ev.clientX;
+                        const cy = ev.touches ? ev.touches[0].clientY : ev.clientY;
+                        return { x: cx, y: cy };
+                    };
+                    const move = (me) => {
+                        const pos = getPos(me);
+                        this.activeStickers[index].x = ((pos.x - rect.left) / rect.width) * 100;
+                        this.activeStickers[index].y = ((pos.y - rect.top) / rect.height) * 100;
+                    };
+                    const up = () => {
+                        window.removeEventListener('mousemove', move);
+                        window.removeEventListener('mouseup', up);
+                        window.removeEventListener('touchmove', move);
+                        window.removeEventListener('touchend', up);
+                    };
+                    window.addEventListener('mousemove', move);
+                    window.addEventListener('mouseup', up);
+                    window.addEventListener('touchmove', move, { passive: false });
+                    window.addEventListener('touchend', up);
+                },
+                removeSticker(idx) { this.activeStickers.splice(idx, 1); },
+                downloadStrip() {
+                    const strip = document.getElementById('final-strip');
+                    const tools = strip.querySelectorAll('.sticker-toolbar, button');
+                    tools.forEach(t => t.style.visibility = 'hidden');
+                    html2canvas(strip, { scale: 3, backgroundColor: null, useCORS: true }).then(canvas => {
+                        const link = document.createElement('a');
+                        link.download = `PinguSnap_Valentine.png`;
+                        link.href = canvas.toDataURL('image/png');
+                        link.click();
+                        tools.forEach(t => t.style.visibility = 'visible');
+                    });
+                },
+                resetBooth() { this.captured = []; this.activeStickers = []; }
+            }
+        }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</body>
+</html>
