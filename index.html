@@ -7,129 +7,124 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <!-- Reliable GIF Generation Library -->
+    <script src="https://cdn.jsdelivr.net/npm/gifshot@0.4.5/build/gifshot.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Gaegu:wght@400;700&display=swap" rel="stylesheet">
     <style>
         body { 
             font-family: 'Fredoka', sans-serif; 
             background: #fffafb; 
             color: #4a4a4a; 
-            margin: 0; 
-            padding: 0; 
+            margin: 0; padding: 0; 
             -webkit-tap-highlight-color: transparent;
             touch-action: manipulation;
         }
         .handwritten { font-family: 'Gaegu', cursive; }
-        
         nav { z-index: 1000; }
-        nav button { pointer-events: auto !important; cursor: pointer; }
         
         #canvas-container { 
-            width: 100%; 
-            height: 100vh; 
-            position: fixed;
-            top: 0;
-            left: 0;
-            z-index: 5; 
-            touch-action: none; 
+            width: 100%; height: 100vh; 
+            position: fixed; top: 0; left: 0;
+            z-index: 5; touch-action: none; 
             overflow: hidden;
+            display: flex; align-items: center; justify-content: center;
         }
 
-        /* Cinematic Bars */
         .cinema-bar {
-            position: fixed;
-            left: 0;
-            width: 100%;
-            height: 0;
-            background: #1a1a1a;
-            z-index: 100;
+            position: fixed; left: 0; width: 100%; height: 0;
+            background: #1a1a1a; z-index: 100;
             transition: height 1s cubic-bezier(0.4, 0, 0.2, 1);
         }
         .cinema-mode .cinema-bar { height: 12vh; }
 
         .polaroid { 
             box-shadow: 0 20px 60px rgba(255, 182, 193, 0.35); 
-            border: 14px solid white; 
-            background: white;
-            transition: all 0.3s ease;
-            position: relative;
+            border: 14px solid white; background: white;
+            transition: all 0.3s ease; position: relative;
         }
 
-        /* Sticker Editor UI - Centered Circular Toolbar */
-        .sticker-wrapper {
-            position: absolute;
-            transform: translate(-50%, -50%);
-            z-index: 200;
-            pointer-events: auto;
-            cursor: move;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
+        /* Laptop Scaling Fixes */
+        @media (min-width: 1024px) {
+            .booth-video-container { max-height: 40vh !important; width: auto !important; margin: 0 auto; }
+            .booth-main-card { max-width: 900px; margin: 0 auto; transform: scale(0.85); transform-origin: top; }
         }
-        .sticker-emoji {
-            font-size: 3.8rem;
-            user-select: none;
-            display: block;
+
+        /* Smooth Horizontal Scrolling Shelves */
+        .scroll-shelf {
+            display: flex;
+            gap: 1.5rem;
+            overflow-x: auto;
+            scroll-behavior: smooth;
+            padding: 1.2rem 0.5rem;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: thin;
+            scrollbar-color: #fecdd3 #fff1f2;
+        }
+        .scroll-shelf::-webkit-scrollbar { height: 8px; }
+        .scroll-shelf::-webkit-scrollbar-track { background: #fff1f2; border-radius: 10px; }
+        .scroll-shelf::-webkit-scrollbar-thumb { background: #fecdd3; border-radius: 10px; border: 2px solid #fff1f2; }
+
+        .sticker-wrapper {
+            position: absolute; transform: translate(-50%, -50%);
+            z-index: 200; pointer-events: auto; cursor: move;
+            display: flex; flex-direction: column; align-items: center;
+        }
+        .sticker-content {
+            user-select: none; display: block;
             filter: drop-shadow(0 4px 8px rgba(0,0,0,0.15));
-            pointer-events: none;
         }
         .sticker-toolbar {
-            position: absolute;
-            bottom: -60px;
-            left: 50%;
+            position: absolute; bottom: -55px; left: 50%;
             transform: translateX(-50%) scale(0.5);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: white;
-            padding: 8px 16px;
-            border-radius: 50px;
-            box-shadow: 0 15px 35px rgba(0,0,0,0.2);
-            gap: 12px;
-            opacity: 0;
-            visibility: hidden;
-            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            border: 2px solid #fee2e2;
-            pointer-events: auto;
+            display: flex; align-items: center; justify-content: center;
+            background: white; padding: 6px 12px; border-radius: 40px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15); gap: 8px;
+            opacity: 0; visibility: hidden;
+            transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            border: 1px solid #fee2e2; pointer-events: auto;
             width: max-content;
         }
         .sticker-wrapper:hover .sticker-toolbar { opacity: 1; visibility: visible; transform: translateX(-50%) scale(1); }
         
         .tool-btn {
-            width: 38px;
-            height: 38px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 18px;
-            font-weight: bold;
-            color: #f43f5e;
-            background: #fff1f2;
-            border: 1px solid #fecdd3;
-            transition: all 0.2s;
-            cursor: pointer;
+            width: 32px; height: 32px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 14px; font-weight: bold; color: #f43f5e;
+            background: #fff1f2; border: 1px solid #fecdd3; cursor: pointer;
         }
-        .tool-btn:hover { background: #f43f5e; color: white; transform: scale(1.15); }
+        .tool-btn:hover { background: #f43f5e; color: white; transform: scale(1.1); }
 
         .flash { position: fixed; inset: 0; background: white; z-index: 2000; pointer-events: none; opacity: 0; transition: opacity 0.1s; }
         .flash.active { opacity: 1; }
 
-        .no-scrollbar::-webkit-scrollbar { display: none; }
         [x-cloak] { display: none !important; }
-
-        .overlay-ui {
-            position: relative;
-            z-index: 50;
-            pointer-events: none;
-        }
+        .overlay-ui { position: relative; z-index: 50; pointer-events: none; }
         .overlay-ui * { pointer-events: auto; }
+        
+        .loading-overlay {
+            position: fixed; inset: 0; background: rgba(255, 255, 255, 0.9);
+            z-index: 5000; display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            backdrop-filter: blur(4px);
+        }
     </style>
 </head>
 <body x-data="pinguApp()" x-init="init()" :class="isLoveAnimating ? 'cinema-mode' : ''" class="overflow-x-hidden">
 
     <div :class="flashActive ? 'active' : ''" class="flash"></div>
 
-    <!-- Cinematic Elements -->
+    <!-- Error/Status Message -->
+    <div x-show="toastMessage" x-transition class="fixed bottom-10 left-1/2 -translate-x-1/2 bg-red-500 text-white px-8 py-4 rounded-full z-[6000] shadow-2xl font-bold" x-cloak>
+        <span x-text="toastMessage"></span>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div x-show="isGenerating" class="loading-overlay" x-cloak>
+        <div class="w-16 h-16 border-4 border-pink-200 border-t-pink-500 rounded-full animate-spin mb-4"></div>
+        <p class="text-pink-600 font-bold animate-pulse text-lg">Capturing your Animated Strip... ✨</p>
+        <p class="text-gray-400 text-xs mt-2 text-center">Capturing 15 high-quality frames.<br>Please don't close the app.</p>
+    </div>
+
     <div class="cinema-bar top-0"></div>
     <div class="cinema-bar bottom-0"></div>
 
@@ -140,33 +135,28 @@
         <button @click="setStep(3)" :class="step === 3 ? 'bg-pink-500 text-white shadow-lg' : 'text-pink-300'" class="px-6 py-2.5 rounded-full font-bold text-sm uppercase tracking-wider outline-none">Letter</button>
     </nav>
 
-    <!-- STEP 1: CINEMATIC STORY -->
+    <!-- STEP 1: STORY -->
     <section x-show="step === 1" x-cloak x-transition.opacity class="min-h-screen relative">
         <div id="canvas-container"></div>
-
-        <!-- Story Intro UI -->
         <div x-show="!isLoveAnimating" class="absolute inset-0 flex flex-col items-center justify-center overlay-ui text-center px-6">
             <h1 class="text-5xl font-bold text-pink-500 tracking-tight mb-4 drop-shadow-sm">Pingu's Story</h1>
-            <p class="text-gray-500 text-lg mb-10 max-w-xs">A little movie about us...</p>
-            
+            <p class="text-gray-500 text-lg mb-10 max-w-xs">Our little journey, just for you... ✨</p>
             <button @click="triggerLoveAnimation" class="bg-pink-500 hover:bg-pink-600 text-white px-12 py-5 rounded-full font-bold text-xl shadow-2xl transition-all transform hover:scale-105 active:scale-95 flex items-center gap-3">
                 Play Our Movie 🎬
             </button>
-            <p class="mt-8 text-pink-300 font-bold handwritten text-2xl">Official since Feb 10th ❤️</p>
+            <p class="mt-8 text-pink-300 font-bold handwritten text-2xl animate-bounce">Feb 10th Forever ❤️</p>
         </div>
-
-        <!-- Dialogue Bubble -->
         <div x-show="bubble" x-transition:enter="transition ease-out duration-500" x-transition:enter-start="opacity-0 translate-y-10 scale-90" class="fixed bottom-28 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur-md px-10 py-6 rounded-[3rem] shadow-2xl border-2 border-pink-100 max-w-sm text-center z-[150] pointer-events-none">
             <p class="text-pink-600 font-bold text-xl handwritten" x-text="message"></p>
         </div>
     </section>
 
-    <!-- STEP 2: PHOTOBOOTH -->
-   <section x-show="step === 2" x-cloak x-transition.opacity class="min-h-screen pt-28 pb-32 px-4 bg-pink-50/10 relative z-[200]">
-        <div class="max-w-6xl mx-auto flex flex-col lg:flex-row gap-10">
+    <!-- STEP 2: BOOTH -->
+    <section x-show="step === 2" x-cloak x-transition.opacity class="min-h-screen pt-28 pb-32 px-4 bg-pink-50/10 relative z-[200]">
+        <div class="max-w-7xl mx-auto flex flex-col lg:flex-row gap-10">
             
             <div class="flex-1 space-y-6">
-                <div class="bg-white p-8 rounded-[3rem] shadow-xl border border-pink-50">
+                <div class="bg-white p-8 rounded-[3rem] shadow-xl border border-pink-50 booth-main-card">
                     <div class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
                         <h2 class="text-3xl font-bold text-pink-500 tracking-tighter">Pingu-Snap 📸</h2>
                         <div class="flex gap-2 bg-pink-50 p-1.5 rounded-full shadow-inner">
@@ -176,7 +166,7 @@
                         </div>
                     </div>
 
-                    <div class="relative bg-slate-900 rounded-[2.5rem] overflow-hidden aspect-[4/3] border-[10px] border-pink-50 shadow-inner">
+                    <div class="relative bg-slate-900 rounded-[2.5rem] overflow-hidden aspect-[4/3] border-[10px] border-pink-50 shadow-inner booth-video-container flex items-center justify-center">
                         <video id="video" autoplay playsinline class="w-full h-full object-cover"></video>
                         <div x-show="!isCapturing && captured.length < photoCount" class="absolute inset-0 flex flex-col items-center justify-center bg-black/40 backdrop-blur-sm">
                             <button @click="startCapture" class="bg-pink-500 text-white px-12 py-4 rounded-full font-bold shadow-2xl hover:scale-105 transition-transform active:scale-95 text-lg">Take Shot 📸</button>
@@ -184,28 +174,40 @@
                         <div x-show="countdown > 0" class="absolute inset-0 flex items-center justify-center text-white text-[160px] font-bold drop-shadow-2xl" x-text="countdown"></div>
                     </div>
 
-                    <!-- Enhanced Sticker Menu -->
                     <div class="mt-8 space-y-6">
-                        <div class="p-8 bg-pink-50/40 rounded-[2.5rem] border border-pink-100">
-                            <p class="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-5 ml-2">All Your Favorites (💌, 🫂, 🫧, 🧋, etc.)</p>
-                            <div class="flex gap-6 text-4xl overflow-x-auto no-scrollbar pb-4 px-2">
+                        <!-- Emoji Shelf -->
+                        <div class="p-6 bg-pink-50/40 rounded-[2.5rem] border border-pink-100">
+                            <p class="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-2">Swipe for Stickers (💌, 🫂, ❄️, etc.)</p>
+                            <div class="scroll-shelf no-scrollbar">
                                 <template x-for="e in emojiLibrary">
-                                    <button @click="addSticker(e)" class="hover:scale-125 transition-transform active:scale-90 flex-shrink-0" x-text="e"></button>
+                                    <button @click="addSticker(e)" class="text-5xl hover:scale-125 transition-transform active:scale-90 flex-shrink-0" x-text="e"></button>
+                                </template>
+                            </div>
+                        </div>
+
+                        <!-- GIF Shelf -->
+                        <div class="p-6 bg-white border-2 border-pink-50 rounded-3xl shadow-sm">
+                            <p class="text-[10px] font-bold text-gray-400 uppercase mb-2 tracking-widest">Magic GIF Buddle (10 Kittens & Penguins!)</p>
+                            <div class="scroll-shelf no-scrollbar">
+                                <template x-for="gif in gifBubbles">
+                                    <button @click="addSticker(gif, 'image')" class="w-24 h-24 rounded-2xl overflow-hidden border border-pink-100 flex-shrink-0 hover:scale-110 transition shadow-sm bg-pink-50/30">
+                                        <img :src="gif" class="w-full h-full object-contain" @dragstart.prevent onerror="this.src='https://placehold.co/100x100?text=GIF'">
+                                    </button>
                                 </template>
                             </div>
                         </div>
 
                         <!-- Import Tools -->
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div class="p-6 bg-white border-2 border-pink-50 rounded-3xl">
-                                <p class="text-[10px] font-bold text-gray-400 uppercase mb-3 tracking-widest">Type a Message Sticker (From Phone Keyboard)</p>
+                            <div class="p-6 bg-white border-2 border-pink-50 rounded-3xl shadow-sm">
+                                <p class="text-[10px] font-bold text-gray-400 uppercase mb-3 tracking-widest">Text Sticker</p>
                                 <div class="flex gap-2">
                                     <input x-model="customText" type="text" placeholder="Type here..." class="flex-1 bg-pink-50/50 border-none rounded-full px-4 text-sm focus:ring-2 focus:ring-pink-300 outline-none">
                                     <button @click="addTextSticker" class="bg-pink-400 text-white px-4 py-2 rounded-full text-xs font-bold shadow-sm hover:bg-pink-500 transition">Add ⌨️</button>
                                 </div>
                             </div>
-                            <div class="p-6 bg-white border-2 border-pink-50 rounded-3xl flex flex-col justify-center">
-                                <p class="text-[10px] font-bold text-gray-400 uppercase mb-3 tracking-widest text-center">Import Image / GIF / Template</p>
+                            <div class="p-6 bg-white border-2 border-pink-50 rounded-3xl flex flex-col justify-center shadow-sm">
+                                <p class="text-[10px] font-bold text-gray-400 uppercase mb-3 tracking-widest text-center">Import Gallery File</p>
                                 <label class="w-full bg-pink-50 text-pink-500 py-2 rounded-full text-xs font-bold text-center cursor-pointer hover:bg-pink-100 transition border border-dashed border-pink-200">
                                     Upload File 📂
                                     <input type="file" @change="handleFileUpload" class="hidden" accept="image/*">
@@ -236,6 +238,7 @@
                         </div>
                     </template>
 
+                    <!-- Draggable Stickers Layer -->
                     <div class="absolute inset-0 pointer-events-none overflow-hidden">
                         <template x-for="(st, index) in activeStickers">
                             <div class="sticker-wrapper" 
@@ -247,10 +250,10 @@
                                     <span class="sticker-content text-6xl" :style="`transform: rotate(${st.rotation}deg) scale(${st.scale});`" x-text="st.value"></span>
                                 </template>
                                 <template x-if="st.type === 'text'">
-                                    <span class="sticker-content handwritten text-3xl font-bold bg-white/80 px-4 py-1 rounded-full text-pink-500 border border-pink-100 whitespace-nowrap" :style="`transform: rotate(${st.rotation}deg) scale(${st.scale});`" x-text="st.value"></span>
+                                    <span class="sticker-content handwritten text-3xl font-bold bg-white/80 px-4 py-1 rounded-full text-pink-500 border border-pink-100 shadow-sm whitespace-nowrap" :style="`transform: rotate(${st.rotation}deg) scale(${st.scale});`" x-text="st.value"></span>
                                 </template>
                                 <template x-if="st.type === 'image'">
-                                    <img :src="st.value" class="sticker-content w-24 h-auto rounded-lg" :style="`transform: rotate(${st.rotation}deg) scale(${st.scale});`" @dragstart.prevent>
+                                    <img :src="st.value" class="sticker-content w-28 h-auto rounded-lg" :style="`transform: rotate(${st.rotation}deg) scale(${st.scale});`" @dragstart.prevent>
                                 </template>
 
                                 <div class="sticker-toolbar">
@@ -270,19 +273,19 @@
                 </div>
 
                 <div class="mt-8 w-full flex flex-col gap-3">
-                    <button @click="downloadStrip" class="w-full bg-pink-500 text-white font-bold py-5 rounded-[2rem] shadow-xl disabled:opacity-50 text-lg transition hover:bg-pink-600" :disabled="captured.length === 0">Download Strip 💾</button>
+                    <button @click="downloadStrip" class="w-full bg-pink-500 text-white font-bold py-5 rounded-[2rem] shadow-xl disabled:opacity-50 text-lg transition hover:bg-pink-600" :disabled="captured.length === 0" x-text="isGenerating ? 'Processing...' : 'Download Strip 💾'"></button>
                     <button @click="resetBooth" class="w-full bg-white text-gray-400 py-3 rounded-[2rem] border-2 border-pink-50 hover:bg-pink-50 transition">Clear & Start Over 🔄</button>
                 </div>
             </div>
         </div>
     </section>
+
     <!-- STEP 3: LETTER -->
     <section x-show="step === 3" x-cloak x-transition.opacity class="min-h-screen flex items-center justify-center p-6 bg-pink-50/20 relative z-[200]">
-        <div class="bg-white p-10 md:p-14 rounded-[3rem] md:rounded-[4rem] shadow-2xl max-w-2xl w-full relative border-b-[20px] border-pink-400 text-center overflow-y-auto max-h-[85vh] no-scrollbar">
-            <div class="absolute -top-12 left-1/2 -translate-x-1/2 text-[80px] md:text-[100px] drop-shadow-xl">💌</div>
-            <h3 class="text-3xl md:text-4xl font-bold text-gray-800 mb-6 mt-4 tracking-tighter">To My Favourite Human,</h3>
-            
-            <div class="space-y-6 text-gray-600 leading-relaxed text-lg md:text-xl handwritten text-left px-2">
+        <div class="bg-white p-10 md:p-14 rounded-[3rem] md:rounded-[4rem] shadow-2xl max-w-2xl w-full relative border-b-[20px] border-pink-400 text-center overflow-y-auto max-h-[85vh] no-scrollbar text-left">
+            <div class="absolute -top-12 left-1/2 -translate-x-1/2 text-[80px] drop-shadow-xl pointer-events-none">💌</div>
+            <h3 class="text-3xl md:text-4xl font-bold text-gray-800 mb-8 mt-4 tracking-tighter text-center">To My Favourite Human,</h3>
+            <div class="space-y-6 text-gray-600 leading-relaxed text-lg md:text-xl handwritten">
                 <p>
                     I’ve been thinking about February 10th since the second it happened. When you said "Yes," it wasn't just a moment—it was the start of something that makes every sunset feel like a movie. Four days might seem short to others, but for me, it feels like I finally found the person I want to waddle through life with.
                 </p>
@@ -294,10 +297,8 @@
                 </p>
                 <p>
                     I promise to always find the best pebbles for you and to keep adding new snapshots to our story, one day at a time. I can't wait for all the waddles, hugs, and forehead kisses that are yet to come.
-                </p>
-            </div>
-
-            <div class="pt-10">
+                </p></div>
+            <div class="pt-12 text-center">
                 <p class="text-pink-500 font-bold text-2xl md:text-3xl mb-2">Happy Valentine's Day! ❤️</p>
                 <p class="text-gray-300 font-bold text-[10px] uppercase tracking-[0.4em]">Forever Yours • 14.02.26</p>
             </div>
@@ -306,24 +307,31 @@
 
     <script>
         // THREE JS GLOBALS
-        let scene, camera, renderer, pingu1, pingu2, hearts = [];
+        let currentRenderer, currentScene, currentCamera, currentAnimationFrame;
+        let pingu1, pingu2, hearts = [];
         let p1Wings = [], p2Wings = [];
         let isCinemaMode = false;
         let storyTime = 0;
+        let heartEndTime = 0;
 
         function pinguApp() {
             return {
-                step: 1,
-                flashActive: false,
-                photoCount: 4,
-                countdown: 0,
-                isCapturing: false,
-                captured: [],
-                activeStickers: [],
-                selectedTemplate: 'pink',
-                bubble: false,
-                message: "",
-                emojiLibrary: ['💌', '🫂', '☃️', '🧋', '🎂', '❄️', '🧿', '📸', '🐧', '🐱', '🎀', '🌷', '🧸', '🐾', '✨', '☁️', '🍰', '🌸', '💖'],
+                step: 1, flashActive: false, photoCount: 4, countdown: 0, isCapturing: false,
+                captured: [], activeStickers: [], selectedTemplate: 'pink', bubble: false, message: "",
+                customText: "", customTemplate: null, isGenerating: false, toastMessage: "",
+                emojiLibrary: ['💌', '🫂', '☃️', '🧋', '🎂', '❄️', '🧿', '📸', '🐧', '🐱', '🎀', '🌷', '🧸', '🐾', '✨', '☁️', '🍰', '🌸', '💖', '🎁', '🍭', '🎈', '🍫'],
+                gifBubbles: [
+                    'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExZDB2NGdvdjlwcWxrOGU4OHI5Njdpa3RhZ2UyM29wd2o0ZjZqZHpzOSZlcD12MV9zdGlja2Vyc19zZWFyY2gmY3Q9cw/xUPGcBPqPXjjZe8fDi/giphy.gif',
+                    'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExZDB2NGdvdjlwcWxrOGU4OHI5Njdpa3RhZ2UyM29wd2o0ZjZqZHpzOSZlcD12MV9zdGlja2Vyc19zZWFyY2gmY3Q9cw/fWrorpy7Jrlvi/giphy.gif',
+                    'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExZmxvNm85NXRsaDI3NmF5YnRscHN2a2x4cHZ3NjFvdHNvNTVqNnVtNiZlcD12MV9zdGlja2Vyc19zZWFyY2gmY3Q9cw/NSF7Vt18VPMigIwTjD/giphy.gif',
+                    'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExZmxvNm85NXRsaDI3NmF5YnRscHN2a2x4cHZ3NjFvdHNvNTVqNnVtNiZlcD12MV9zdGlja2Vyc19zZWFyY2gmY3Q9cw/MRTNlDA7STm5g4XA3T/giphy.gif',
+                    'https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExeXJvMjAyNGpoaXB5bWcyaGpwdnp2aXg3cXk5ZXNyczdmM3h3aWFwMSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/Ihpbk00M2nxeyCTjeT/giphy.gif',
+                    'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExZXNqaDZqY2swamdrNmo2cm03Z284ODF2OGszYW4waDdvaDlhY28zYiZlcD12MV9zdGlja2Vyc19zZWFyY2gmY3Q9cw/hW4YT5QnCh3SNDWFzF/giphy.gif',
+                    'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExbXZzbWVnd2NvcHk1cWk0NGQzcmg4OHR6am44dDl6ejNxYXIwMGRleCZlcD12MV9zdGlja2Vyc19zZWFyY2gmY3Q9cw/SYOPDLT1mWE4LHVkvj/giphy.gif',
+                    'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExbGY1cXBicDI0ZGNuaW1sM3A2MHAyb2JpNXNidHNlaGE2a3Nqb3ZldiZlcD12MV9zdGlja2Vyc19zZWFyY2gmY3Q9cw/7ii59EaAYu8Vpkgx8X/giphy.gif',
+                    'https://media.giphy.com/media/v1.Y2lkPWVjZjA1ZTQ3b2MzNGt5dHpnOWQycWhvYnp3NWI3a3E1ajR2ZW5vdHR2bWlvbndraSZlcD12MV9zdGlja2Vyc19zZWFyY2gmY3Q9cw/l1IKhv1QKVN8RLbg9d/giphy.gif',
+                    'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExNHE5NWx6MGV2NDVvN3F4N28xY29rYXB6cWV0dTBuYmh0aWNremI0NCZlcD12MV9naWZzX3NlYXJjaCZjdD1n/1JmGiBtqTuehfYxuy9/giphy.gif'
+                ],
                 templates: {
                     pink: { bg: 'bg-[#fff0f3]', text: 'text-pink-400' },
                     white: { bg: 'bg-white', text: 'text-gray-400' },
@@ -332,210 +340,172 @@
                 isLoveAnimating: false,
 
                 init() {
-                    this.$nextTick(() => {
-                        this.init3D();
-                        this.setupCamera();
-                    });
+                    this.$nextTick(() => { this.init3D(); this.setupCamera(); });
                 },
 
                 setStep(s) {
                     this.step = s;
+                    if(s === 1) this.init3D();
                     if(s === 2) setTimeout(() => this.setupCamera(), 100);
                 },
 
                 async triggerLoveAnimation() {
                     if (this.isLoveAnimating) return;
-                    this.isLoveAnimating = true;
-                    isCinemaMode = true;
-                    storyTime = Date.now();
-
-                    const playScript = async () => {
-                        this.bubble = true;
-                        this.message = "Hey you... ✨";
-                        await new Promise(r => setTimeout(r, 2000));
-                        this.message = "Do you remember Feb 10th?";
-                        await new Promise(r => setTimeout(r, 2500));
-                        this.message = "When you said YES... ❤️";
-                        await new Promise(r => setTimeout(r, 2500));
-                        this.message = "Since then, my world is pink!";
-                        await new Promise(r => setTimeout(r, 3000));
-                        this.message = "I love you so much. Happy Valentine's!";
-                        await new Promise(r => setTimeout(r, 4000));
-                        this.bubble = false;
-                        this.isLoveAnimating = false;
-                        isCinemaMode = false;
-                    };
-                    playScript();
+                    this.isLoveAnimating = true; isCinemaMode = true; storyTime = Date.now();
+                    heartEndTime = Date.now() + 27000;
+                    const script = [
+                        { msg: "Hey you... ✨", time: 2000 },
+                        { msg: "Remember Feb 10th?", time: 2500 },
+                        { msg: "When you said YES! ❤️", time: 2500 },
+                        { msg: "Since then, every day is pink.", time: 3000 },
+                        { msg: "Happy Valentine's, my love!", time: 4000 }
+                    ];
+                    this.bubble = true;
+                    for (let line of script) {
+                        this.message = line.msg;
+                        await new Promise(r => setTimeout(r, line.time));
+                    }
+                    this.bubble = false; this.isLoveAnimating = false; isCinemaMode = false;
                 },
 
-                createPearPingu(color, hasBow) {
+                createPlushPingu(color, hasBow) {
                     const group = new THREE.Group();
                     const wings = [];
-                    
-                    // Pear Body
-                    const body = new THREE.Mesh(
-                        new THREE.SphereGeometry(1, 32, 32),
-                        new THREE.MeshStandardMaterial({ color: color, roughness: 0.8 })
-                    );
-                    body.scale.set(1.1, 1.45, 1);
+                    const bodyMat = new THREE.MeshStandardMaterial({ color: color, roughness: 0.85 });
+                    const whiteMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9 });
+                    const body = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 32), bodyMat);
+                    body.scale.set(1.2, 1.35, 1.1);
                     group.add(body);
-
-                    // Belly
-                    const belly = new THREE.Mesh(
-                        new THREE.SphereGeometry(0.85, 24, 24),
-                        new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1.0 })
-                    );
-                    belly.position.set(0, -0.1, 0.45);
-                    belly.scale.set(0.85, 0.95, 0.4);
-                    group.add(belly);
-
-                    // Arms
-                    const armGeo = new THREE.SphereGeometry(0.35, 16, 16);
+                    const face = new THREE.Mesh(new THREE.SphereGeometry(0.98, 32, 32), whiteMat);
+                    face.position.set(0, -0.05, 0.35); face.scale.set(0.9, 1.0, 0.45);
+                    group.add(face);
                     [-1, 1].forEach(side => {
-                        const armContainer = new THREE.Group();
-                        armContainer.position.set(side * 0.95, 0.2, 0.1);
-                        const arm = new THREE.Mesh(armGeo, new THREE.MeshStandardMaterial({ color: color }));
-                        arm.scale.set(0.6, 1.3, 0.4);
-                        arm.position.y = -0.4;
-                        armContainer.add(arm);
-                        armContainer.rotation.z = side * 0.4;
-                        group.add(armContainer);
-                        wings.push(armContainer);
+                        const wingRoot = new THREE.Group(); wingRoot.position.set(side * 1.1, 0.2, 0.15);
+                        const wing = new THREE.Mesh(new THREE.SphereGeometry(0.32, 16, 16), bodyMat);
+                        wing.scale.set(0.5, 1.3, 0.3); wing.position.y = -0.4;
+                        wingRoot.add(wing); wingRoot.rotation.z = side * 0.45;
+                        group.add(wingRoot); wings.push(wingRoot);
                     });
-
-                    // Feet
                     const footMat = new THREE.MeshStandardMaterial({ color: 0xffa726 });
                     [-1, 1].forEach(side => {
-                        const foot = new THREE.Mesh(new THREE.SphereGeometry(0.3, 12, 12), footMat);
-                        foot.scale.set(1, 0.4, 1.4);
-                        foot.position.set(side * 0.5, -1.3, 0.3);
+                        const foot = new THREE.Mesh(new THREE.SphereGeometry(0.35, 16, 16), footMat);
+                        foot.scale.set(1.1, 0.38, 1.4); foot.position.set(side * 0.48, -1.3, 0.35);
                         group.add(foot);
                     });
-
-                    // Eyes & Beak
-                    const eyeGeo = new THREE.SphereGeometry(0.12, 12, 12);
-                    const eyeMat = new THREE.MeshStandardMaterial({ color: 0x000000 });
                     [-1, 1].forEach(side => {
-                        const eye = new THREE.Mesh(eyeGeo, eyeMat);
-                        eye.position.set(side * 0.35, 0.7, 0.85);
-                        group.add(eye);
+                        const eye = new THREE.Mesh(new THREE.SphereGeometry(0.14, 12, 12), new THREE.MeshStandardMaterial({ color: 0x222222 }));
+                        eye.position.set(side * 0.32, 0.75, 0.8); group.add(eye);
                     });
-                    const beak = new THREE.Mesh(new THREE.ConeGeometry(0.15, 0.3, 12), footMat);
-                    beak.rotation.x = Math.PI / 1.7;
-                    beak.position.set(0, 0.45, 1);
-                    group.add(beak);
-
-                    // Blush
-                    const blushMat = new THREE.MeshStandardMaterial({ color: 0xffb3c1, transparent: true, opacity: 0.6 });
-                    [-1, 1].forEach(side => {
-                        const blush = new THREE.Mesh(new THREE.SphereGeometry(0.2, 12, 12), blushMat);
-                        blush.position.set(side * 0.6, 0.3, 0.8);
-                        blush.scale.z = 0.1;
-                        group.add(blush);
-                    });
-
+                    // PERFECT CONICAL BEAK
+                    const beak = new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.4, 16), footMat);
+                    beak.rotation.x = Math.PI / 1.7; beak.position.set(0, 0.45, 0.95); group.add(beak);
                     if (hasBow) {
-                        const bowMat = new THREE.MeshStandardMaterial({ color: 0xff69b4 });
-                        const b = new THREE.Mesh(new THREE.SphereGeometry(0.12, 12, 12), bowMat);
-                        b.position.set(0.4, 1.2, 0.5);
-                        group.add(b);
+                        const b = new THREE.Mesh(new THREE.SphereGeometry(0.15, 12, 12), new THREE.MeshStandardMaterial({ color: 0xff69b4 }));
+                        b.position.set(0.4, 1.25, 0.5); group.add(b);
                     } else {
-                        const scarf = new THREE.Mesh(new THREE.TorusGeometry(0.85, 0.13, 12, 40), new THREE.MeshStandardMaterial({ color: 0xef4444 }));
-                        scarf.rotation.x = Math.PI/2;
-                        scarf.position.y = 0.1;
-                        group.add(scarf);
+                        const scarf = new THREE.Mesh(new THREE.TorusGeometry(0.88, 0.14, 12, 40), new THREE.MeshStandardMaterial({ color: 0xef4444 }));
+                        scarf.rotation.x = Math.PI/2; scarf.position.y = 0.15; group.add(scarf);
                     }
-
                     return { group, wings };
                 },
 
                 init3D() {
                     const container = document.getElementById('canvas-container');
-                    scene = new THREE.Scene();
-                    camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-                    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-                    renderer.setSize(window.innerWidth, window.innerHeight);
-                    renderer.setPixelRatio(window.devicePixelRatio);
-                    container.appendChild(renderer.domElement);
-
-                    scene.add(new THREE.AmbientLight(0xffffff, 1.2));
-                    const dl = new THREE.DirectionalLight(0xffffff, 0.5);
-                    dl.position.set(5, 10, 5);
-                    scene.add(dl);
-
-                    const p1 = this.createPearPingu(0x222222, false);
-                    pingu1 = p1.group; p1Wings = p1.wings;
-                    const p2 = this.createPearPingu(0x222222, true);
-                    pingu2 = p2.group; p2Wings = p2.wings;
+                    if(!container) return;
                     
-                    scene.add(pingu1); scene.add(pingu2);
-                    pingu2.position.x = 12;
-                    camera.position.set(0, 1, 8);
+                    // DISPOSAL LOGIC - Prevent 3 Penguin Bug
+                    if (currentRenderer) {
+                        currentRenderer.dispose();
+                        cancelAnimationFrame(currentAnimationFrame);
+                        container.innerHTML = "";
+                    }
+                    
+                    currentScene = new THREE.Scene();
+                    const aspect = window.innerWidth / window.innerHeight;
+                    currentCamera = new THREE.PerspectiveCamera(45, aspect, 0.1, 1000);
+                    currentRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+                    currentRenderer.setSize(window.innerWidth, window.innerHeight);
+                    currentRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                    container.appendChild(currentRenderer.domElement);
 
-                    // Hearts
+                    currentScene.add(new THREE.AmbientLight(0xffffff, 1.3));
+                    const dl = new THREE.DirectionalLight(0xffffff, 0.6);
+                    dl.position.set(5, 10, 5); currentScene.add(dl);
+
+                    const p1Data = this.createPlushPingu(0x333333, false);
+                    pingu1 = p1Data.group; p1Wings = p1Data.wings;
+                    const p2Data = this.createPlushPingu(0x333333, true);
+                    pingu2 = p2Data.group; p2Wings = p2Data.wings;
+                    
+                    currentScene.add(pingu1); currentScene.add(pingu2);
+                    pingu2.position.x = 15; currentCamera.position.set(0, 1, 10);
+
+                    // Hearts setup
+                    hearts = [];
                     const hs = new THREE.Shape();
                     hs.moveTo(0,0); hs.bezierCurveTo(0,0.1,-0.2,0.5,-0.5,0.5); hs.bezierCurveTo(-1,0.5,-1,-0.2,-1,-0.2); hs.bezierCurveTo(-1,-0.6,-0.5,-1.1,0,-1.5); hs.bezierCurveTo(0.5,-1.1,1,-0.6,1,-0.2); hs.bezierCurveTo(1,-0.2,1,0.5,0.5,0.5); hs.bezierCurveTo(0.2,0.5,0,0.1,0,0);
-                    const hMat = new THREE.MeshBasicMaterial({ color: 0xff4d6d });
-                    for(let i=0; i<20; i++) {
+                    const hMat = new THREE.MeshBasicMaterial({ color: 0xff4d6d, side: THREE.DoubleSide });
+                    for(let i=0; i<15; i++) {
                         const h = new THREE.Mesh(new THREE.ShapeGeometry(hs), hMat);
                         h.scale.set(0,0,0); h.rotation.x = Math.PI;
-                        scene.add(h); hearts.push(h);
+                        currentScene.add(h); hearts.push(h);
                     }
 
                     const animate = () => {
-                        requestAnimationFrame(animate);
+                        currentAnimationFrame = requestAnimationFrame(animate);
                         const t = Date.now() * 0.001;
+                        const winAspect = window.innerWidth / window.innerHeight;
+                        const targetZ = winAspect > 1 ? 14 : 10; 
 
-                        if (isCinemaMode) {
+                        if (isCinemaMode || Date.now() < heartEndTime) {
                             const dt = Date.now() - storyTime;
-                            
-                            // Phase 1: Walking together
-                            pingu1.position.x = THREE.MathUtils.lerp(pingu1.position.x, -0.5, 0.05);
-                            pingu2.position.x = THREE.MathUtils.lerp(pingu2.position.x, 0.5, 0.05);
-                            
-                            // Phase 2: The Hug (Wrap arms)
-                            if (dt > 3000) {
-                                pingu1.rotation.z = THREE.MathUtils.lerp(pingu1.rotation.z, 0.25, 0.1);
-                                pingu2.rotation.z = THREE.MathUtils.lerp(pingu2.rotation.z, -0.25, 0.1);
-                                p1Wings.forEach((w,i) => w.rotation.y = THREE.MathUtils.lerp(w.rotation.y, i==0?0.9:-0.9, 0.1));
-                                p2Wings.forEach((w,i) => w.rotation.y = THREE.MathUtils.lerp(w.rotation.y, i==0?0.9:-0.9, 0.1));
+                            if (isCinemaMode) {
+                                pingu1.position.x = THREE.MathUtils.lerp(pingu1.position.x, -0.4, 0.04);
+                                pingu2.position.x = THREE.MathUtils.lerp(pingu2.position.x, 0.4, 0.04);
+                                if (dt > 3000) {
+                                    pingu1.rotation.z = THREE.MathUtils.lerp(pingu1.rotation.z, 0.22, 0.08);
+                                    pingu2.rotation.z = THREE.MathUtils.lerp(pingu2.rotation.z, -0.22, 0.08);
+                                    p1Wings[0].rotation.y = THREE.MathUtils.lerp(p1Wings[0].rotation.y, 1.2, 0.1);
+                                    p2Wings[1].rotation.y = THREE.MathUtils.lerp(p2Wings[1].rotation.y, -1.2, 0.1);
+                                }
+                                if (dt > 7000) {
+                                    pingu2.position.y = THREE.MathUtils.lerp(pingu2.position.y, 0.65, 0.1);
+                                    pingu2.position.x = THREE.MathUtils.lerp(pingu2.position.x, 0.15, 0.1);
+                                    pingu2.rotation.z = THREE.MathUtils.lerp(pingu2.rotation.z, -0.45, 0.1);
+                                }
                             }
-                            
-                            // Phase 3: The Kiss
-                            if (dt > 7000) {
-                                pingu2.position.y = THREE.MathUtils.lerp(pingu2.position.y, 0.5, 0.1);
-                                pingu2.position.x = THREE.MathUtils.lerp(pingu2.position.x, 0.2, 0.1);
+                            const elapsedSinceKiss = dt - 7000;
+                            if (elapsedSinceKiss > 0 && Date.now() < heartEndTime) {
                                 hearts.forEach((h, i) => {
-                                    if(dt > 7500 + i*100) {
-                                        h.scale.set(0.15,0.15,0.15);
-                                        h.position.set(Math.sin(t*2+i)*3, Math.cos(t*2+i)*3+2, Math.sin(i)*2);
+                                    if(elapsedSinceKiss > i * 150) {
+                                        h.scale.set(0.12, 0.12, 0.12);
+                                        h.position.set(Math.sin(t*2.5+i)*3, Math.cos(t*2.5+i)*3+2.5, Math.sin(i)*2);
                                     }
                                 });
-                            }
-
-                            // Camera movement
-                            camera.position.z = THREE.MathUtils.lerp(camera.position.z, 6, 0.02);
+                            } else { hearts.forEach(h => h.scale.set(0,0,0)); }
+                            currentCamera.position.z = THREE.MathUtils.lerp(currentCamera.position.z, targetZ - 3, 0.015);
                         } else {
-                            // IDLE
-                            pingu1.position.x = THREE.MathUtils.lerp(pingu1.position.x, 0, 0.05);
-                            pingu2.position.x = THREE.MathUtils.lerp(pingu2.position.x, 12, 0.05);
-                            pingu1.rotation.y = Math.sin(t) * 0.2;
-                            pingu1.rotation.z = 0;
-                            p1Wings.forEach(w => w.rotation.y = THREE.MathUtils.lerp(w.rotation.y, 0, 0.1));
-                            hearts.forEach(h => h.scale.set(0,0,0));
-                            camera.position.z = THREE.MathUtils.lerp(camera.position.z, 8, 0.05);
+                            if (pingu1 && pingu2) {
+                                pingu1.position.x = THREE.MathUtils.lerp(pingu1.position.x, 0, 0.05);
+                                pingu2.position.x = THREE.MathUtils.lerp(pingu2.position.x, 18, 0.05);
+                                pingu1.rotation.y = Math.sin(t) * 0.2;
+                                currentCamera.position.z = THREE.MathUtils.lerp(currentCamera.position.z, targetZ, 0.05);
+                                pingu1.scale.x = 1; pingu2.scale.x = 1; pingu2.position.y = 0;
+                                p1Wings.forEach(w => w.rotation.y = THREE.MathUtils.lerp(w.rotation.y, 0, 0.1));
+                                p2Wings.forEach(w => w.rotation.y = THREE.MathUtils.lerp(w.rotation.y, 0, 0.1));
+                                hearts.forEach(h => h.scale.set(0,0,0));
+                            }
                         }
-
-                        pingu1.scale.y = 1.45 * (1 + Math.sin(t*2)*0.02);
-                        pingu2.scale.y = 1.45 * (1 + Math.sin(t*2)*0.02);
-                        renderer.render(scene, camera);
+                        if (pingu1 && pingu2) {
+                            const breathe = 1 + Math.sin(t*2.5)*0.015;
+                            pingu1.scale.y = 1 * breathe; pingu2.scale.y = 1 * breathe;
+                        }
+                        currentRenderer.render(currentScene, currentCamera);
                     };
                     animate();
-                    
                     window.addEventListener('resize', () => {
-                        camera.aspect = window.innerWidth / window.innerHeight;
-                        camera.updateProjectionMatrix();
-                        renderer.setSize(window.innerWidth, window.innerHeight);
+                        currentCamera.aspect = window.innerWidth / window.innerHeight;
+                        currentCamera.updateProjectionMatrix(); currentRenderer.setSize(window.innerWidth, window.innerHeight);
                     });
                 },
 
@@ -570,7 +540,26 @@
                     setTimeout(() => this.flashActive = false, 150);
                 },
                 retake(idx) { this.captured.splice(idx, 1); },
-                addSticker(emoji) { this.activeStickers.push({ emoji, x: 50, y: 50, rotation: 0, scale: 1.2 }); },
+
+                addSticker(val, type = 'emoji') {
+                    this.activeStickers.push({ value: val, type: type, x: 50, y: 50, rotation: 0, scale: 1.0 });
+                },
+                addTextSticker() {
+                    if (!this.customText) return;
+                    this.addSticker(this.customText, 'text');
+                    this.customText = "";
+                },
+                handleFileUpload(e) {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = (f) => {
+                        const choice = confirm("Use as custom Template background? (Cancel to add as Sticker)");
+                        if (choice) this.customTemplate = f.target.result;
+                        else this.addSticker(f.target.result, 'image');
+                    };
+                    reader.readAsDataURL(file);
+                },
                 dragStart(e, index) {
                     const rect = document.getElementById('final-strip').getBoundingClientRect();
                     const getPos = (ev) => {
@@ -584,34 +573,79 @@
                         this.activeStickers[index].y = ((pos.y - rect.top) / rect.height) * 100;
                     };
                     const up = () => {
-                        window.removeEventListener('mousemove', move);
-                        window.removeEventListener('mouseup', up);
-                        window.removeEventListener('touchmove', move);
-                        window.removeEventListener('touchend', up);
+                        window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up);
+                        window.removeEventListener('touchmove', move); window.removeEventListener('touchend', up);
                     };
-                    window.addEventListener('mousemove', move);
-                    window.addEventListener('mouseup', up);
-                    window.addEventListener('touchmove', move, { passive: false });
-                    window.addEventListener('touchend', up);
+                    window.addEventListener('mousemove', move); window.addEventListener('mouseup', up);
+                    window.addEventListener('touchmove', move, { passive: false }); window.addEventListener('touchend', up);
                 },
                 removeSticker(idx) { this.activeStickers.splice(idx, 1); },
-                downloadStrip() {
+
+                async downloadStrip() {
+                    if (this.isGenerating) return;
+                    
                     const strip = document.getElementById('final-strip');
+                    const hasAnimated = this.activeStickers.some(s => s.type === 'image' && s.value.includes('.gif'));
+                    
+                    this.isGenerating = true;
+                    this.toastMessage = "";
                     const tools = strip.querySelectorAll('.sticker-toolbar, button');
                     tools.forEach(t => t.style.visibility = 'hidden');
-                    html2canvas(strip, { scale: 3, backgroundColor: null, useCORS: true }).then(canvas => {
-                        const link = document.createElement('a');
-                        link.download = `PinguSnap_Valentine.png`;
-                        link.href = canvas.toDataURL('image/png');
-                        link.click();
+                    
+                    try {
+                        if (hasAnimated && typeof window.gifshot !== 'undefined') {
+                            const frames = [];
+                            for (let i = 0; i < 15; i++) {
+                                const canvas = await html2canvas(strip, { 
+                                    scale: 1.2, backgroundColor: null, useCORS: true, logging: false
+                                });
+                                frames.push(canvas.toDataURL('image/png'));
+                                await new Promise(r => setTimeout(r, 120)); 
+                            }
+
+                            window.gifshot.createGIF({
+                                images: frames,
+                                gifWidth: strip.offsetWidth * 1.5,
+                                gifHeight: strip.offsetHeight * 1.5,
+                                interval: 0.12,
+                                numFrames: 15
+                            }, (obj) => {
+                                if (!obj.error) {
+                                    const link = document.createElement('a');
+                                    link.download = `PinguSnap_Valentine_${Date.now()}.gif`;
+                                    link.href = obj.image;
+                                    link.click();
+                                } else {
+                                    this.fallbackPNGDownload(strip);
+                                }
+                                this.isGenerating = false;
+                                tools.forEach(t => t.style.visibility = 'visible');
+                            });
+                        } else {
+                            await this.fallbackPNGDownload(strip);
+                            this.isGenerating = false;
+                            tools.forEach(t => t.style.visibility = 'visible');
+                        }
+                    } catch (e) {
+                        this.isGenerating = false;
                         tools.forEach(t => t.style.visibility = 'visible');
-                    });
+                        this.toastMessage = "Capture failed. Try again!";
+                        setTimeout(() => this.toastMessage = "", 3000);
+                    }
                 },
-                resetBooth() { this.captured = []; this.activeStickers = []; }
+
+                async fallbackPNGDownload(strip) {
+                    const canvas = await html2canvas(strip, { scale: 3, backgroundColor: null, useCORS: true });
+                    const link = document.createElement('a');
+                    link.download = `PinguSnap_Valentine_${Date.now()}.png`;
+                    link.href = canvas.toDataURL('image/png');
+                    link.click();
+                },
+
+                resetBooth() { this.captured = []; this.activeStickers = []; this.customTemplate = null; }
             }
         }
     </script>
     <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 </body>
-
 </html>
