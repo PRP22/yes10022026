@@ -162,7 +162,7 @@
     </section>
 
     <!-- STEP 2: PHOTOBOOTH -->
-    <section x-show="step === 2" x-cloak x-transition.opacity class="min-h-screen pt-28 pb-32 px-4 bg-pink-50/10 relative z-[200]">
+   <section x-show="step === 2" x-cloak x-transition.opacity class="min-h-screen pt-28 pb-32 px-4 bg-pink-50/10 relative z-[200]">
         <div class="max-w-6xl mx-auto flex flex-col lg:flex-row gap-10">
             
             <div class="flex-1 space-y-6">
@@ -184,19 +184,45 @@
                         <div x-show="countdown > 0" class="absolute inset-0 flex items-center justify-center text-white text-[160px] font-bold drop-shadow-2xl" x-text="countdown"></div>
                     </div>
 
-                    <div class="mt-8 p-8 bg-pink-50/40 rounded-[2.5rem] border border-pink-100">
-                        <p class="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-5 ml-2">Decorate your memories</p>
-                        <div class="flex gap-6 text-4xl overflow-x-auto no-scrollbar pb-3 px-2">
-                            <template x-for="e in emojiLibrary">
-                                <button @click="addSticker(e)" class="hover:scale-125 transition-transform active:scale-90 flex-shrink-0" x-text="e"></button>
-                            </template>
+                    <!-- Enhanced Sticker Menu -->
+                    <div class="mt-8 space-y-6">
+                        <div class="p-8 bg-pink-50/40 rounded-[2.5rem] border border-pink-100">
+                            <p class="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-5 ml-2">All Your Favorites (💌, 🫂, 🫧, 🧋, etc.)</p>
+                            <div class="flex gap-6 text-4xl overflow-x-auto no-scrollbar pb-4 px-2">
+                                <template x-for="e in emojiLibrary">
+                                    <button @click="addSticker(e)" class="hover:scale-125 transition-transform active:scale-90 flex-shrink-0" x-text="e"></button>
+                                </template>
+                            </div>
+                        </div>
+
+                        <!-- Import Tools -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="p-6 bg-white border-2 border-pink-50 rounded-3xl">
+                                <p class="text-[10px] font-bold text-gray-400 uppercase mb-3 tracking-widest">Type a Message Sticker (From Phone Keyboard)</p>
+                                <div class="flex gap-2">
+                                    <input x-model="customText" type="text" placeholder="Type here..." class="flex-1 bg-pink-50/50 border-none rounded-full px-4 text-sm focus:ring-2 focus:ring-pink-300 outline-none">
+                                    <button @click="addTextSticker" class="bg-pink-400 text-white px-4 py-2 rounded-full text-xs font-bold shadow-sm hover:bg-pink-500 transition">Add ⌨️</button>
+                                </div>
+                            </div>
+                            <div class="p-6 bg-white border-2 border-pink-50 rounded-3xl flex flex-col justify-center">
+                                <p class="text-[10px] font-bold text-gray-400 uppercase mb-3 tracking-widest text-center">Import Image / GIF / Template</p>
+                                <label class="w-full bg-pink-50 text-pink-500 py-2 rounded-full text-xs font-bold text-center cursor-pointer hover:bg-pink-100 transition border border-dashed border-pink-200">
+                                    Upload File 📂
+                                    <input type="file" @change="handleFileUpload" class="hidden" accept="image/*">
+                                </label>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
 
+            <!-- Preview Strip -->
             <div class="w-full lg:w-80 flex flex-col items-center">
-                <div id="final-strip" :class="templates[selectedTemplate].bg" class="polaroid w-full flex flex-col items-center gap-4 p-6 min-h-[600px] transition-colors duration-500">
+                <div id="final-strip" 
+                     :class="templates[selectedTemplate].bg" 
+                     :style="customTemplate ? `background-image: url(${customTemplate}); background-size: cover; background-position: center;` : ''"
+                     class="polaroid w-full flex flex-col items-center gap-4 p-6 min-h-[600px] transition-colors duration-500">
+                    
                     <template x-for="(pic, idx) in captured">
                         <div class="relative w-full group">
                             <img :src="pic" class="w-full aspect-[4/3] object-cover rounded shadow-sm border border-black/5">
@@ -210,14 +236,23 @@
                         </div>
                     </template>
 
-                    <!-- Stickers -->
                     <div class="absolute inset-0 pointer-events-none overflow-hidden">
                         <template x-for="(st, index) in activeStickers">
                             <div class="sticker-wrapper" 
                                  :style="`left: ${st.x}%; top: ${st.y}%;`"
                                  @mousedown="dragStart($event, index)"
                                  @touchstart.stop="dragStart($event, index)">
-                                <span class="sticker-emoji" :style="`transform: rotate(${st.rotation}deg) scale(${st.scale});`" x-text="st.emoji"></span>
+                                
+                                <template x-if="st.type === 'emoji'">
+                                    <span class="sticker-content text-6xl" :style="`transform: rotate(${st.rotation}deg) scale(${st.scale});`" x-text="st.value"></span>
+                                </template>
+                                <template x-if="st.type === 'text'">
+                                    <span class="sticker-content handwritten text-3xl font-bold bg-white/80 px-4 py-1 rounded-full text-pink-500 border border-pink-100 whitespace-nowrap" :style="`transform: rotate(${st.rotation}deg) scale(${st.scale});`" x-text="st.value"></span>
+                                </template>
+                                <template x-if="st.type === 'image'">
+                                    <img :src="st.value" class="sticker-content w-24 h-auto rounded-lg" :style="`transform: rotate(${st.rotation}deg) scale(${st.scale});`" @dragstart.prevent>
+                                </template>
+
                                 <div class="sticker-toolbar">
                                     <button @click.stop="st.rotation += 45" class="tool-btn">↻</button>
                                     <button @click.stop="st.scale += 0.2" class="tool-btn">+</button>
@@ -241,7 +276,6 @@
             </div>
         </div>
     </section>
-
     <!-- STEP 3: LETTER -->
     <section x-show="step === 3" x-cloak x-transition.opacity class="min-h-screen flex items-center justify-center p-6 bg-pink-50/20 relative z-[200]">
         <div class="bg-white p-10 md:p-14 rounded-[3rem] md:rounded-[4rem] shadow-2xl max-w-2xl w-full relative border-b-[20px] border-pink-400 text-center overflow-y-auto max-h-[85vh] no-scrollbar">
@@ -289,7 +323,7 @@
                 selectedTemplate: 'pink',
                 bubble: false,
                 message: "",
-                emojiLibrary: ['❤️', '🌷', '🎀', '🐱', '🐧', '🧸', '✨', '🌸', '💖', '🐾', '☁️', '🎀'],
+                emojiLibrary: ['💌', '🫂', '☃️', '🧋', '🎂', '❄️', '🧿', '📸', '🐧', '🐱', '🎀', '🌷', '🧸', '🐾', '✨', '☁️', '🍰', '🌸', '💖'],
                 templates: {
                     pink: { bg: 'bg-[#fff0f3]', text: 'text-pink-400' },
                     white: { bg: 'bg-white', text: 'text-gray-400' },
@@ -579,4 +613,5 @@
     </script>
     <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 </body>
+
 </html>
